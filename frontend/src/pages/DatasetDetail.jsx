@@ -349,12 +349,22 @@ export default function DatasetDetail() {
     );
   }
 
-  const ds = report?.dataset;
-  const columns = [...(report?.column_profiles ?? [])].sort(
+  // API returns flat fields — normalise into a ds object for the template
+  const ds = report
+    ? {
+        name: report.dataset_name,
+        row_count: report.row_count,
+        column_count: report.column_count,
+        overall_quality_score: report.overall_quality_score,
+        file_type: 'csv',
+        status: 'profiled',
+      }
+    : null;
+  const columns = [...(report?.columns ?? [])].sort(
     (a, b) => (a.position ?? 0) - (b.position ?? 0)
   );
-  const quality = report?.quality_results?.[0] ?? report?.quality_result ?? null;
-  const overallScore = ds?.overall_quality_score ?? quality?.overall_score;
+  const quality = report?.quality ?? null;
+  const overallScore = report?.overall_quality_score ?? quality?.overall_score;
   const scoreColor = qualityColor(overallScore);
 
   return (
