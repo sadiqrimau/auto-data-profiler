@@ -14,6 +14,7 @@ class QualityResult(Base):
     completeness_score = Column(Float, nullable=True)
     validity_score = Column(Float, nullable=True)
     consistency_score = Column(Float, nullable=True)
+    accuracy_score = Column(Float, nullable=True)
     overall_score = Column(Float, nullable=True)
 
     # Issues found

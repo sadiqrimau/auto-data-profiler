@@ -41,6 +41,7 @@ class QualityResultResponse(BaseModel):
     completeness_score: Optional[float] = None
     validity_score: Optional[float] = None
     consistency_score: Optional[float] = None
+    accuracy_score: Optional[float] = None
     overall_score: Optional[float] = None
     issues: Optional[Any] = None
     anomalies: Optional[Any] = None

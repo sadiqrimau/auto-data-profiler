@@ -10,6 +10,8 @@ from app.profiling.statistical import compute_column_statistics
 from app.profiling.type_inference import infer_column_type
 from app.quality.completeness import compute_completeness
 from app.quality.validity import compute_validity
+from app.quality.consistency import compute_consistency
+from app.quality.accuracy import compute_accuracy
 import pandas as pd
 import os
 import shutil
@@ -127,13 +129,19 @@ async def upload_and_profile(
 
         # Quality assessment
         completeness_score = compute_completeness(df)
-        validity_score = compute_validity(df)
-        overall_score = round((completeness_score + validity_score) / 2, 2)
+        validity_score     = compute_validity(df)
+        consistency_score  = compute_consistency(df)
+        accuracy_score     = compute_accuracy(df)
+        overall_score = round(
+            (completeness_score + validity_score + consistency_score + accuracy_score) / 4, 2
+        )
 
         quality = QualityResult(
             dataset_id=dataset.id,
             completeness_score=completeness_score,
             validity_score=validity_score,
+            consistency_score=consistency_score,
+            accuracy_score=accuracy_score,
             overall_score=overall_score,
             issues={},
             anomalies=anomalies_by_column,

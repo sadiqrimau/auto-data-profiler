@@ -600,9 +600,8 @@ export default function DatasetDetail() {
                 <QualityBar label="Overall Quality"  score={quality.overall_score ?? overallScore} />
                 <QualityBar label="Completeness"     score={quality.completeness_score} />
                 <QualityBar label="Validity"         score={quality.validity_score} />
-                {quality.consistency_score != null && (
-                  <QualityBar label="Consistency" score={quality.consistency_score} />
-                )}
+                <QualityBar label="Consistency"      score={quality.consistency_score} />
+                <QualityBar label="Accuracy"         score={quality.accuracy_score} />
               </Box>
 
               {quality.issues && Object.keys(quality.issues).length > 0 && (
