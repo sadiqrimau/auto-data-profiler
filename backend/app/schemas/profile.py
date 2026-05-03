@@ -42,8 +42,8 @@ class QualityResultResponse(BaseModel):
     validity_score: Optional[float] = None
     consistency_score: Optional[float] = None
     overall_score: Optional[float] = None
-    issues: Optional[List[Dict[str, Any]]] = None
-    anomalies: Optional[List[Dict[str, Any]]] = None
+    issues: Optional[Any] = None
+    anomalies: Optional[Any] = None
 
     class Config:
         from_attributes = True

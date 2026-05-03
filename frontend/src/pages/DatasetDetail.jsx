@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box, Typography, Button, Tabs, Tab, Paper, Chip, CircularProgress,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -7,6 +7,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip,
   Cell, ResponsiveContainer,
@@ -272,13 +273,45 @@ function NumericRangeViz({ col }) {
   );
 }
 
+/* ─── Anomaly section ────────────────────────────────────────── */
+function AnomalyDetail({ anomaly }) {
+  if (!anomaly || anomaly.outlier_count === 0) return null;
+  return (
+    <Box sx={{
+      mt: 2.5,
+      p: 2,
+      bgcolor: 'rgba(255,176,32,0.04)',
+      border: '1px solid rgba(255,176,32,0.18)',
+      borderRadius: '8px',
+    }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <WarningAmberIcon sx={{ fontSize: 14, color: AMBER }} />
+        <Typography sx={{
+          fontFamily: '"DM Mono", monospace', fontSize: '0.65rem',
+          color: AMBER, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600,
+        }}>
+          {anomaly.outlier_count} outlier{anomaly.outlier_count !== 1 ? 's' : ''} detected — {anomaly.outlier_pct}% of values
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <StatBlock label="Method"      value={anomaly.method} />
+        <StatBlock label="Lower Bound" value={fmt(anomaly.lower_bound)} />
+        <StatBlock label="Upper Bound" value={fmt(anomaly.upper_bound)} />
+        <StatBlock label="Below Bound" value={anomaly.low_outliers} />
+        <StatBlock label="Above Bound" value={anomaly.high_outliers} />
+      </Box>
+    </Box>
+  );
+}
+
 /* ─── Column row ─────────────────────────────────────────────── */
-function ColumnRow({ col }) {
+function ColumnRow({ col, anomaly }) {
   const [open, setOpen] = useState(false);
   const topValues = parseJSON(col.top_values);
   const patterns  = parseJSON(col.patterns);
   const isNum = ['integer', 'float'].includes(col.inferred_type);
   const isStr = col.inferred_type === 'string';
+  const hasAnomaly = anomaly && anomaly.outlier_count > 0;
 
   return (
     <>
@@ -289,9 +322,20 @@ function ColumnRow({ col }) {
           </IconButton>
         </TableCell>
         <TableCell>
-          <Typography sx={{ fontFamily: '"DM Mono", monospace', fontWeight: 500, color: '#C8D0E8', fontSize: '0.82rem' }}>
-            {col.column_name}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography sx={{ fontFamily: '"DM Mono", monospace', fontWeight: 500, color: '#C8D0E8', fontSize: '0.82rem' }}>
+              {col.column_name}
+            </Typography>
+            {hasAnomaly && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4,
+                bgcolor: 'rgba(255,176,32,0.1)', borderRadius: '4px', px: 0.6, py: 0.2 }}>
+                <WarningAmberIcon sx={{ fontSize: 10, color: AMBER }} />
+                <Typography sx={{ fontFamily: '"DM Mono", monospace', fontSize: '0.6rem', color: AMBER, fontWeight: 600 }}>
+                  {anomaly.outlier_count}
+                </Typography>
+              </Box>
+            )}
+          </Box>
         </TableCell>
         <TableCell><TypeChip type={col.inferred_type} /></TableCell>
         <TableCell align="right">
@@ -357,6 +401,9 @@ function ColumnRow({ col }) {
 
               {/* Numeric distribution range visualiser */}
               {isNum && <NumericRangeViz col={col} />}
+
+              {/* Anomaly detection results */}
+              <AnomalyDetail anomaly={anomaly} />
 
               {/* Value frequency bar chart */}
               {topValues.length > 0 && <ValueDistributionChart topValues={topValues} />}
@@ -463,8 +510,9 @@ export default function DatasetDetail() {
     status: 'profiled',
   } : null;
 
-  const columns     = [...(report?.columns ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-  const quality     = report?.quality ?? null;
+  const columns      = [...(report?.columns ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const quality      = report?.quality ?? null;
+  const anomalies    = quality?.anomalies ?? {};
   const overallScore = report?.overall_quality_score ?? quality?.overall_score;
   const scoreColor  = qualityColor(overallScore);
 
@@ -536,7 +584,7 @@ export default function DatasetDetail() {
             </TableHead>
             <TableBody>
               {columns.map((col) => (
-                <ColumnRow key={col.id ?? col.column_name} col={col} />
+                <ColumnRow key={col.id ?? col.column_name} col={col} anomaly={anomalies[col.column_name]} />
               ))}
             </TableBody>
           </Table>
@@ -564,6 +612,42 @@ export default function DatasetDetail() {
                     <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.9, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <Typography sx={{ color: '#7A8AB0', fontSize: '0.82rem' }}>{key}</Typography>
                       <Typography sx={{ fontFamily: '"DM Mono", monospace', color: '#525C78', fontSize: '0.78rem' }}>{String(val)}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
+              {Object.keys(anomalies).length > 0 && (
+                <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <WarningAmberIcon sx={{ fontSize: 14, color: AMBER }} />
+                    <Typography sx={{ ...LABEL_SX, mb: 0, color: AMBER }}>
+                      Anomalies Detected ({Object.keys(anomalies).length} column{Object.keys(anomalies).length !== 1 ? 's' : ''})
+                    </Typography>
+                  </Box>
+                  {Object.entries(anomalies).map(([colName, a]) => (
+                    <Box key={colName} sx={{
+                      mb: 1.5, p: 2,
+                      bgcolor: 'rgba(255,176,32,0.03)',
+                      border: '1px solid rgba(255,176,32,0.12)',
+                      borderRadius: '8px',
+                    }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography sx={{ fontFamily: '"DM Mono", monospace', fontSize: '0.78rem', color: '#C8D0E8', fontWeight: 500 }}>
+                          {colName}
+                        </Typography>
+                        <Chip
+                          label={`${a.outlier_count} outlier${a.outlier_count !== 1 ? 's' : ''} (${a.outlier_pct}%)`}
+                          size="small"
+                          sx={{ bgcolor: 'rgba(255,176,32,0.1)', color: AMBER, fontFamily: '"DM Mono", monospace', fontSize: '0.6rem', height: 20 }}
+                        />
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                        <StatBlock label="Lower Bound" value={fmt(a.lower_bound)} />
+                        <StatBlock label="Upper Bound" value={fmt(a.upper_bound)} />
+                        <StatBlock label="Below" value={a.low_outliers} />
+                        <StatBlock label="Above" value={a.high_outliers} />
+                      </Box>
                     </Box>
                   ))}
                 </Box>

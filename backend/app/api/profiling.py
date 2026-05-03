@@ -10,9 +10,33 @@ from app.profiling.statistical import compute_column_statistics
 from app.profiling.type_inference import infer_column_type
 from app.quality.completeness import compute_completeness
 from app.quality.validity import compute_validity
+import pandas as pd
 import os
 import shutil
-import tempfile
+
+
+def _detect_anomalies(series: pd.Series, q1: float, q3: float) -> dict | None:
+    """IQR-based outlier detection. Returns None if IQR is zero or data is empty."""
+    iqr = q3 - q1
+    if iqr == 0:
+        return None
+    lower = q1 - 1.5 * iqr
+    upper = q3 + 1.5 * iqr
+    numeric = pd.to_numeric(series, errors="coerce").dropna()
+    if len(numeric) == 0:
+        return None
+    n_low  = int((numeric < lower).sum())
+    n_high = int((numeric > upper).sum())
+    total  = n_low + n_high
+    return {
+        "method": "IQR",
+        "lower_bound": round(float(lower), 4),
+        "upper_bound": round(float(upper), 4),
+        "outlier_count": total,
+        "outlier_pct": round(total / len(numeric) * 100, 2),
+        "low_outliers": n_low,
+        "high_outliers": n_high,
+    }
 
 router = APIRouter(prefix="/profile", tags=["Profiling"])
 
@@ -52,6 +76,7 @@ async def upload_and_profile(
         db.refresh(dataset)
 
         column_profiles = []
+        anomalies_by_column = {}
 
         for position, col_name in enumerate(df.columns):
             series = df[col_name]
@@ -61,6 +86,15 @@ async def upload_and_profile(
 
             # Compute stats
             stats = compute_column_statistics(series, inferred_type)
+
+            # Anomaly detection for numeric columns (IQR method)
+            if inferred_type in ("integer", "float"):
+                q1_val = stats.get("q1")
+                q3_val = stats.get("q3")
+                if q1_val is not None and q3_val is not None:
+                    anomaly = _detect_anomalies(series, q1_val, q3_val)
+                    if anomaly and anomaly["outlier_count"] > 0:
+                        anomalies_by_column[col_name] = anomaly
 
             col_profile = ColumnProfile(
                 dataset_id=dataset.id,
@@ -101,8 +135,8 @@ async def upload_and_profile(
             completeness_score=completeness_score,
             validity_score=validity_score,
             overall_score=overall_score,
-            issues=[],
-            anomalies=[]
+            issues={},
+            anomalies=anomalies_by_column,
         )
         db.add(quality)
 
