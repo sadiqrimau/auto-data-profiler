@@ -12,6 +12,7 @@ from app.quality.completeness import compute_completeness
 from app.quality.validity import compute_validity
 from app.quality.consistency import compute_consistency
 from app.quality.accuracy import compute_accuracy
+from app.services.doc_generator import generate_dataset_documentation
 import pandas as pd
 import os
 import shutil
@@ -185,6 +186,29 @@ def get_profiling_report(dataset_id: int, db: Session = Depends(get_db)):
         row_count=dataset.row_count or 0,
         column_count=dataset.column_count or 0,
         overall_quality_score=dataset.overall_quality_score,
+        documentation=dataset.documentation,
         columns=columns,
         quality=quality
     )
+
+
+@router.post("/{dataset_id}/generate-docs")
+def generate_docs(dataset_id: int, db: Session = Depends(get_db)):
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    columns = db.query(ColumnProfile).filter(ColumnProfile.dataset_id == dataset_id).all()
+    quality = db.query(QualityResult).filter(QualityResult.dataset_id == dataset_id).first()
+
+    try:
+        doc = generate_dataset_documentation(dataset, columns, quality)
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Documentation generation failed: {str(e)}")
+
+    dataset.documentation = doc
+    db.commit()
+
+    return {"documentation": doc}

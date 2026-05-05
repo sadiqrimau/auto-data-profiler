@@ -56,5 +56,6 @@ class ProfilingReportResponse(BaseModel):
     row_count: int
     column_count: int
     overall_quality_score: Optional[float] = None
+    documentation: Optional[str] = None
     columns: List[ColumnProfileResponse]
     quality: Optional[QualityResultResponse] = None

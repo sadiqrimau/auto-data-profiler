@@ -13,7 +13,7 @@ import {
   Cell, ResponsiveContainer,
 } from 'recharts';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getReport } from '../api/client';
+import { getReport, generateDocs } from '../api/client';
 import { alpha } from '@mui/material/styles';
 
 const ACCENT   = '#0FD4A4';
@@ -441,6 +441,99 @@ function ColumnRow({ col, anomaly }) {
   );
 }
 
+/* ─── Inline markdown → React nodes ─────────────────────────── */
+function InlineText({ text }) {
+  // split() with a capture group keeps the delimiters in the result array
+  const tokens = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/);
+  return (
+    <>
+      {tokens.map((token, i) => {
+        if (token.startsWith('**') && token.endsWith('**')) {
+          return <strong key={i} style={{ color: '#C8D0E8' }}>{token.slice(2, -2)}</strong>;
+        }
+        if (token.startsWith('`') && token.endsWith('`')) {
+          return (
+            <Box key={i} component="code" sx={{
+              fontFamily: '"DM Mono", monospace', fontSize: '0.8rem',
+              bgcolor: 'rgba(255,255,255,0.06)', px: '5px', borderRadius: '3px', color: ACCENT,
+            }}>{token.slice(1, -1)}</Box>
+          );
+        }
+        return <span key={i}>{token}</span>;
+      })}
+    </>
+  );
+}
+
+/* ─── Markdown renderer ──────────────────────────────────────── */
+function MarkdownDoc({ markdown }) {
+  const lines = markdown.split('\n');
+  const nodes = [];
+  let listBuffer = [];
+
+  const flushList = (key) => {
+    if (!listBuffer.length) return;
+    nodes.push(
+      <Box key={`list-${key}`} component="ul" sx={{ pl: 2.5, my: 1 }}>
+        {listBuffer.map((item, i) => (
+          <Box key={i} component="li" sx={{ mb: 0.5 }}>
+            <Typography component="span" sx={{ fontSize: '0.88rem', color: '#A0AABF', lineHeight: 1.7 }}>
+              <InlineText text={item} />
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    );
+    listBuffer = [];
+  };
+
+  lines.forEach((raw, i) => {
+    const line = raw.trimEnd();
+    if (line.startsWith('# ')) {
+      flushList(i);
+      nodes.push(
+        <Typography key={i} variant="h5" sx={{
+          fontFamily: '"Sora", sans-serif', color: ACCENT, fontWeight: 700,
+          mt: i === 0 ? 0 : 3, mb: 1.5, fontSize: '1.25rem',
+          borderBottom: `1px solid rgba(15,212,164,0.15)`, pb: 1,
+        }}>{line.slice(2)}</Typography>
+      );
+    } else if (line.startsWith('## ')) {
+      flushList(i);
+      nodes.push(
+        <Typography key={i} variant="h6" sx={{
+          fontFamily: '"Sora", sans-serif', color: '#C8D0E8',
+          fontWeight: 600, mt: 2.5, mb: 1, fontSize: '1rem',
+        }}>{line.slice(3)}</Typography>
+      );
+    } else if (line.startsWith('### ')) {
+      flushList(i);
+      nodes.push(
+        <Typography key={i} sx={{
+          fontFamily: '"DM Mono", monospace', color: AMBER, fontWeight: 600,
+          mt: 2, mb: 0.75, fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.06em',
+        }}>{line.slice(4)}</Typography>
+      );
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      listBuffer.push(line.slice(2));
+    } else if (line.trim() === '') {
+      flushList(i);
+    } else if (line === '---') {
+      flushList(i);
+      nodes.push(<Box key={i} sx={{ borderTop: '1px solid rgba(255,255,255,0.06)', my: 3 }} />);
+    } else {
+      flushList(i);
+      nodes.push(
+        <Typography key={i} component="p" sx={{ fontSize: '0.88rem', color: '#A0AABF', lineHeight: 1.75, mb: 0.5 }}>
+          <InlineText text={line} />
+        </Typography>
+      );
+    }
+  });
+  flushList('end');
+  return <Box>{nodes}</Box>;
+}
+
 /* ─── Quality bar ────────────────────────────────────────────── */
 function QualityBar({ label, score }) {
   const color = qualityColor(score);
@@ -463,15 +556,18 @@ function QualityBar({ label, score }) {
 export default function DatasetDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [report, setReport]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
-  const [tab, setTab]         = useState(0);
+  const [report, setReport]       = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [tab, setTab]             = useState(0);
+  const [docs, setDocs]           = useState(null);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsError, setDocsError] = useState(null);
 
   useEffect(() => {
     setLoading(true);
     getReport(id)
-      .then(({ data }) => setReport(data))
+      .then(({ data }) => { setReport(data); if (data.documentation) setDocs(data.documentation); })
       .catch(() => setError('Could not load dataset report. Make sure the backend is running.'))
       .finally(() => setLoading(false));
   }, [id]);
@@ -565,6 +661,7 @@ export default function DatasetDetail() {
         sx={{ mb: 3, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <Tab label={`Columns (${columns.length})`} />
         <Tab label="Quality" />
+        <Tab label="Documentation" />
       </Tabs>
 
       {/* Columns tab */}
@@ -660,6 +757,80 @@ export default function DatasetDetail() {
             }}>
               Quality results are not available for this dataset.
             </Alert>
+          )}
+        </Box>
+      )}
+
+      {/* Documentation tab */}
+      {tab === 2 && (
+        <Box>
+          {/* Action bar */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Typography sx={{ fontFamily: '"DM Mono", monospace', fontSize: '0.68rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: ACCENT, mb: 0.5 }}>
+                AI-Generated Documentation
+              </Typography>
+              <Typography sx={{ color: '#525C78', fontSize: '0.8rem' }}>
+                {docs ? 'Documentation generated by Claude. Click Regenerate to refresh.' : 'Click Generate to create documentation for this dataset.'}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {docs && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => navigator.clipboard.writeText(docs)}
+                  sx={{ borderColor: 'rgba(255,255,255,0.1)', color: '#525C78', fontSize: '0.75rem' }}
+                >
+                  Copy Markdown
+                </Button>
+              )}
+              <Button
+                size="small"
+                variant="contained"
+                disabled={docsLoading}
+                onClick={() => {
+                  setDocsLoading(true);
+                  setDocsError(null);
+                  generateDocs(id)
+                    .then(({ data }) => setDocs(data.documentation))
+                    .catch((err) => setDocsError(err?.response?.data?.detail || 'Generation failed. Check that ANTHROPIC_API_KEY is set on Render.'))
+                    .finally(() => setDocsLoading(false));
+                }}
+                sx={{
+                  bgcolor: ACCENT, color: '#0B0D13', fontWeight: 600, fontSize: '0.75rem',
+                  '&:hover': { bgcolor: '#0bbf95' },
+                  '&:disabled': { bgcolor: 'rgba(15,212,164,0.2)', color: 'rgba(255,255,255,0.3)' },
+                }}
+              >
+                {docsLoading ? <CircularProgress size={14} sx={{ color: 'inherit' }} /> : docs ? 'Regenerate' : 'Generate Documentation'}
+              </Button>
+            </Box>
+          </Box>
+
+          {docsError && (
+            <Alert severity="error" sx={{
+              mb: 3, bgcolor: 'rgba(255,78,110,0.07)', color: '#FF8FAB',
+              border: '1px solid rgba(255,78,110,0.18)',
+              '& .MuiAlert-icon': { color: '#FF4E6E' },
+            }}>
+              {docsError}
+            </Alert>
+          )}
+
+          {docs ? (
+            <Paper elevation={0} sx={{ p: 4 }}>
+              <MarkdownDoc markdown={docs} />
+            </Paper>
+          ) : !docsLoading && (
+            <Box sx={{
+              border: '1px dashed rgba(255,255,255,0.08)', borderRadius: '12px',
+              p: 6, textAlign: 'center',
+            }}>
+              <Typography sx={{ color: '#2E3448', fontSize: '0.88rem' }}>
+                No documentation yet. Hit <strong style={{ color: ACCENT }}>Generate Documentation</strong> above.
+              </Typography>
+            </Box>
           )}
         </Box>
       )}

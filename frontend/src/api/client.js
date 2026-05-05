@@ -26,5 +26,6 @@ export const getDatasets = () => api.get('/datasets/');
 export const getDataset = (id) => api.get(`/datasets/${id}`);
 export const getReport = (id) => api.get(`/profile/${id}/report`);
 export const deleteDataset = (id) => api.delete(`/datasets/${id}`);
+export const generateDocs = (id) => api.post(`/profile/${id}/generate-docs`);
 
 export default api;

@@ -15,6 +15,7 @@ class Dataset(Base):
     column_count = Column(Integer, nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
     overall_quality_score = Column(Float, nullable=True)
+    documentation = Column(Text, nullable=True)
     status = Column(String(50), default="pending")        # pending, profiling, completed, failed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
