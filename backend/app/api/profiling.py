@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from typing import Optional
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.dataset import Dataset
@@ -50,24 +51,35 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload", response_model=ProfilingReportResponse)
 async def upload_and_profile(
     file: UploadFile = File(...),
+    dataset_name: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported at this stage")
+    filename = file.filename or ""
+    is_csv  = filename.lower().endswith(".csv")
+    is_xlsx = filename.lower().endswith(".xlsx") or filename.lower().endswith(".xls")
+
+    if not is_csv and not is_xlsx:
+        raise HTTPException(status_code=400, detail="Only CSV and Excel (.xlsx) files are supported")
 
     # Save uploaded file temporarily
-    tmp_path = os.path.join(UPLOAD_DIR, file.filename)
+    tmp_path = os.path.join(UPLOAD_DIR, filename)
     with open(tmp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
     try:
         # Load data
-        df = load_csv(tmp_path)
+        if is_xlsx:
+            df = pd.read_excel(tmp_path, engine="openpyxl")
+        else:
+            df = load_csv(tmp_path)
+
+        display_name = (dataset_name.strip() if dataset_name and dataset_name.strip() else None) or filename
+        file_type    = "xlsx" if is_xlsx else "csv"
 
         # Create dataset record
         dataset = Dataset(
-            name=file.filename,
-            file_type="csv",
+            name=display_name,
+            file_type=file_type,
             source_path=tmp_path,
             row_count=len(df),
             column_count=len(df.columns),

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
-  Box, Typography, Button, LinearProgress, Alert, Paper, Chip,
+  Box, Typography, Button, LinearProgress, Alert, Paper, Chip, TextField,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
@@ -27,24 +27,27 @@ const ANALYSIS_ITEMS = [
 ];
 
 export default function Upload() {
-  const [file, setFile] = useState(null);
+  const [file, setFile]         = useState(null);
+  const [datasetName, setDatasetName] = useState('');
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [profiling, setProfiling] = useState(false);
-  const [error, setError] = useState(null);
-  const [done, setDone] = useState(false);
+  const [error, setError]       = useState(null);
+  const [done, setDone]         = useState(false);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
   const handleFile = (f) => {
     if (!f) return;
-    if (!f.name.endsWith('.csv')) {
-      setError('Only CSV files are supported.');
+    const name = f.name.toLowerCase();
+    if (!name.endsWith('.csv') && !name.endsWith('.xlsx') && !name.endsWith('.xls')) {
+      setError('Only CSV and Excel (.xlsx) files are supported.');
       return;
     }
     setFile(f);
     setError(null);
+    if (!datasetName) setDatasetName(f.name.replace(/\.(csv|xlsx|xls)$/i, ''));
   };
 
   const onDrop = useCallback((e) => {
@@ -63,7 +66,7 @@ export default function Upload() {
     setError(null);
     setProgress(0);
     try {
-      await uploadDataset(file, file.name.replace('.csv', ''), (p) => {
+      await uploadDataset(file, datasetName.trim() || file.name.replace(/\.(csv|xlsx|xls)$/i, ''), (p) => {
         setProgress(p);
         if (p === 100) setProfiling(true);
       });
@@ -97,7 +100,7 @@ export default function Upload() {
           Upload a Dataset
         </Typography>
         <Typography variant="body2" sx={{ color: '#525C78', maxWidth: 500 }}>
-          Upload a CSV file to automatically profile structure, detect data types,
+          Upload a CSV or Excel file to automatically profile structure, detect data types,
           compute statistics, and assess data quality.
         </Typography>
       </Box>
@@ -135,7 +138,7 @@ export default function Upload() {
         <input
           ref={inputRef}
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls"
           style={{ display: 'none' }}
           onChange={(e) => handleFile(e.target.files[0])}
         />
@@ -166,7 +169,7 @@ export default function Upload() {
               or click to browse
             </Typography>
             <Chip
-              label="CSV only"
+              label="CSV · XLSX"
               size="small"
               sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: '#3A4258' }}
             />
@@ -211,9 +214,34 @@ export default function Upload() {
         )}
       </Paper>
 
+      {/* Dataset name input */}
+      {file && !uploading && !done && (
+        <Box sx={{ mt: 3, maxWidth: 540 }}>
+          <TextField
+            fullWidth
+            size="small"
+            label="Dataset name"
+            placeholder={file.name.replace(/\.(csv|xlsx|xls)$/i, '')}
+            value={datasetName}
+            onChange={(e) => setDatasetName(e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                color: '#C8D0E8',
+                fontFamily: '"DM Sans", sans-serif',
+                '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                '&.Mui-focused fieldset': { borderColor: ACCENT },
+              },
+              '& .MuiInputLabel-root': { color: '#525C78' },
+              '& .MuiInputLabel-root.Mui-focused': { color: ACCENT },
+            }}
+          />
+        </Box>
+      )}
+
       {/* Upload button */}
       {file && !uploading && !done && (
-        <Box sx={{ mt: 3 }}>
+        <Box sx={{ mt: 2 }}>
           <Button variant="contained" onClick={handleUpload} sx={{ px: 4, py: 1.1 }}>
             Profile Dataset
           </Button>
