@@ -8,11 +8,11 @@ def compute_column_statistics(series: pd.Series, inferred_type: str) -> Dict[str
     total = len(series)
     null_count = series.isna().sum()
 
-    stats["row_count"] = total
+    stats["row_count"] = int(total)
     stats["null_count"] = int(null_count)
-    stats["null_rate"] = round(null_count / total, 4) if total > 0 else 0.0
+    stats["null_rate"] = float(round(null_count / total, 4)) if total > 0 else 0.0
     stats["distinct_count"] = int(series.nunique())
-    stats["is_unique"] = stats["distinct_count"] == total
+    stats["is_unique"] = bool(stats["distinct_count"] == total)
 
     # Top values by frequency
     top = series.value_counts().head(10)
@@ -67,7 +67,7 @@ def detect_patterns(series: pd.Series) -> list:
 
     for name, pattern in patterns:
         matches = sample.str.match(pattern, na=False).sum()
-        coverage = round(matches / total, 4)
+        coverage = float(round(matches / total, 4))
         if coverage >= 0.5:
             results.append({"pattern": name, "coverage": coverage})
 
