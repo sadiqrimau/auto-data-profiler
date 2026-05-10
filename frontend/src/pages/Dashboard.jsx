@@ -8,6 +8,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import TableChartIcon from '@mui/icons-material/TableChart';
 import { useNavigate } from 'react-router-dom';
 import { getDatasets, deleteDataset } from '../api/client';
 import { alpha } from '@mui/material/styles';
@@ -96,7 +97,7 @@ export default function Dashboard() {
       const { data } = await getDatasets();
       setDatasets(data);
     } catch {
-      setError('Could not connect to backend. Make sure the API server is running on port 8000.');
+      setError('Could not load datasets. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -104,8 +105,9 @@ export default function Dashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleDelete = async (id, e) => {
+  const handleDelete = async (id, name, e) => {
     e.stopPropagation();
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeleting(id);
     try {
       await deleteDataset(id);
@@ -214,21 +216,34 @@ export default function Dashboard() {
         <Box
           sx={{
             textAlign: 'center',
-            py: 10,
+            py: 12,
             border: '1px dashed rgba(255,255,255,0.07)',
             borderRadius: '14px',
           }}
         >
+          <Box sx={{
+            width: 48, height: 48, borderRadius: '13px',
+            background: alpha(ACCENT, 0.08),
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            mx: 'auto', mb: 2.5,
+          }}>
+            <TableChartIcon sx={{ fontSize: 22, color: alpha(ACCENT, 0.5) }} />
+          </Box>
           <Typography
-            sx={{ fontFamily: '"Sora", sans-serif', color: '#2E3448', mb: 1, fontSize: '1rem', fontWeight: 600 }}
+            sx={{ fontFamily: '"Sora", sans-serif', color: '#5A6480', mb: 0.75, fontSize: '1rem', fontWeight: 600 }}
           >
-            No datasets profiled yet
+            No datasets yet
           </Typography>
-          <Typography variant="body2" sx={{ color: '#2E3448', mb: 3 }}>
-            Upload a CSV file to get started
+          <Typography variant="body2" sx={{ color: '#2E3448', mb: 3.5 }}>
+            Upload a CSV file to automatically profile it and assess data quality
           </Typography>
-          <Button variant="outlined" onClick={() => navigate('/upload')}>
-            Upload Dataset
+          <Button
+            variant="contained"
+            startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+            onClick={() => navigate('/upload')}
+            sx={{ bgcolor: ACCENT, color: '#0B0D13', fontWeight: 600, '&:hover': { bgcolor: '#0bbf95' } }}
+          >
+            Upload Your First Dataset
           </Button>
         </Box>
       )}
@@ -312,7 +327,7 @@ export default function Dashboard() {
                       <Tooltip title="Delete dataset">
                         <IconButton
                           size="small"
-                          onClick={(e) => handleDelete(ds.id, e)}
+                          onClick={(e) => handleDelete(ds.id, ds.name, e)}
                           disabled={deleting === ds.id}
                           sx={{ color: '#525C78', '&:hover': { color: '#FF4E6E' } }}
                         >

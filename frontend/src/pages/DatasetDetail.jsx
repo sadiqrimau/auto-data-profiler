@@ -416,7 +416,7 @@ function ColumnRow({ col, anomaly }) {
                     {patterns.map((p, i) => (
                       <Chip
                         key={i}
-                        label={String(p)}
+                        label={typeof p === 'object' ? `${p.pattern} · ${(p.coverage * 100).toFixed(0)}%` : String(p)}
                         size="small"
                         sx={{
                           bgcolor: alpha(ACCENT, 0.08), color: ACCENT,
@@ -563,6 +563,7 @@ export default function DatasetDetail() {
   const [docs, setDocs]           = useState(null);
   const [docsLoading, setDocsLoading] = useState(false);
   const [docsError, setDocsError] = useState(null);
+  const [copied, setCopied]       = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -779,10 +780,14 @@ export default function DatasetDetail() {
                 <Button
                   size="small"
                   variant="outlined"
-                  onClick={() => navigator.clipboard.writeText(docs)}
-                  sx={{ borderColor: 'rgba(255,255,255,0.1)', color: '#525C78', fontSize: '0.75rem' }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(docs);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  sx={{ borderColor: copied ? alpha(ACCENT, 0.4) : 'rgba(255,255,255,0.1)', color: copied ? ACCENT : '#525C78', fontSize: '0.75rem' }}
                 >
-                  Copy Markdown
+                  {copied ? 'Copied!' : 'Copy Markdown'}
                 </Button>
               )}
               <Button

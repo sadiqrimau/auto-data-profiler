@@ -19,9 +19,11 @@ const formatSize = (bytes) => {
 
 const ANALYSIS_ITEMS = [
   ['Type Inference', 'Detects boolean, integer, float, date, and string types with confidence scores'],
-  ['Statistics', 'Mean, median, std dev, quartiles, skewness and kurtosis for numeric columns'],
-  ['Pattern Detection', 'Identifies email, phone, URL, IP address, and postal code formats'],
-  ['Quality Scores', 'Completeness and validity scored 0–100 per column and at dataset level'],
+  ['Statistics', 'Mean, median, std dev, quartiles, skewness, kurtosis, and value distributions for every column'],
+  ['Pattern Detection', 'Identifies email, phone, URL, IP address, postal code, and alphanumeric formats'],
+  ['Quality Scores', 'Completeness, validity, consistency, and accuracy scored 0–100 at dataset level'],
+  ['Anomaly Detection', 'IQR-based outlier detection flags suspicious values in numeric columns'],
+  ['AI Documentation', 'Claude generates a structured dataset summary with field-level insights'],
 ];
 
 export default function Upload() {
@@ -29,6 +31,7 @@ export default function Upload() {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [profiling, setProfiling] = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
   const inputRef = useRef(null);
@@ -56,19 +59,21 @@ export default function Upload() {
   const handleUpload = async () => {
     if (!file) return;
     setUploading(true);
+    setProfiling(false);
     setError(null);
     setProgress(0);
     try {
-      await uploadDataset(file, file.name.replace('.csv', ''), (p) => setProgress(p));
+      await uploadDataset(file, file.name.replace('.csv', ''), (p) => {
+        setProgress(p);
+        if (p === 100) setProfiling(true);
+      });
       setDone(true);
       setTimeout(() => navigate('/datasets'), 1400);
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-          'Upload failed. Make sure the backend is running on port 8000.'
-      );
+      setError(err.response?.data?.detail || 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
+      setProfiling(false);
     }
   };
 
@@ -220,18 +225,18 @@ export default function Upload() {
         <Box sx={{ maxWidth: 540, mt: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography variant="caption" sx={{ color: '#525C78' }}>
-              {progress < 100 ? 'Uploading file…' : 'Profiling dataset…'}
+              {profiling ? 'Profiling dataset — this may take a moment…' : 'Uploading file…'}
             </Typography>
-            <Typography
-              sx={{ fontFamily: '"DM Mono", monospace', fontSize: '0.75rem', color: ACCENT }}
-            >
-              {progress}%
-            </Typography>
+            {!profiling && (
+              <Typography sx={{ fontFamily: '"DM Mono", monospace', fontSize: '0.75rem', color: ACCENT }}>
+                {progress}%
+              </Typography>
+            )}
           </Box>
           <LinearProgress
-            variant="determinate"
-            value={progress}
-            sx={{ '& .MuiLinearProgress-bar': { background: ACCENT } }}
+            variant={profiling ? 'indeterminate' : 'determinate'}
+            value={profiling ? undefined : progress}
+            sx={{ '& .MuiLinearProgress-bar': { background: ACCENT }, '& .MuiLinearProgress-bar1Indeterminate': { background: ACCENT }, '& .MuiLinearProgress-bar2Indeterminate': { background: alpha(ACCENT, 0.4) } }}
           />
         </Box>
       )}
