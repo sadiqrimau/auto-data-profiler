@@ -8,6 +8,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import DownloadIcon from '@mui/icons-material/Download';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip,
   Cell, ResponsiveContainer,
@@ -565,6 +566,48 @@ export default function DatasetDetail() {
   const [docsError, setDocsError] = useState(null);
   const [copied, setCopied]       = useState(false);
 
+  const handleExport = () => {
+    if (!report) return;
+    const payload = {
+      dataset: {
+        name: report.dataset_name,
+        row_count: report.row_count,
+        column_count: report.column_count,
+        overall_quality_score: report.overall_quality_score,
+      },
+      quality: report.quality,
+      columns: (report.columns ?? []).map((c) => ({
+        name: c.column_name,
+        position: c.position,
+        type: c.inferred_type,
+        type_confidence: c.type_confidence,
+        null_rate: c.null_rate,
+        distinct_count: c.distinct_count,
+        is_unique: c.is_unique,
+        mean: c.mean,
+        median: c.median,
+        std_dev: c.std_dev,
+        min: c.min_value,
+        max: c.max_value,
+        q1: c.q1,
+        q3: c.q3,
+        skewness: c.skewness,
+        kurtosis: c.kurtosis,
+        top_values: c.top_values,
+        patterns: c.patterns,
+      })),
+      documentation: docs ?? report.documentation ?? null,
+      exported_at: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `${report.dataset_name.replace(/\.csv$/i, '')}_profile.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     setLoading(true);
     getReport(id)
@@ -629,11 +672,24 @@ export default function DatasetDetail() {
           <Typography variant="h4" sx={{ color: '#E2E6F0', mb: 1.5 }}>
             {ds?.name ?? 'Unnamed Dataset'}
           </Typography>
-          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignItems: 'center' }}>
             <Chip label={`${(ds?.row_count ?? 0).toLocaleString()} rows`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#7A8AB0' }} />
             <Chip label={`${ds?.column_count ?? 0} columns`}             size="small" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#7A8AB0' }} />
             <Chip label={(ds?.file_type ?? 'csv').toUpperCase()}          size="small" sx={{ bgcolor: 'rgba(255,255,255,0.04)', color: '#3A4258' }} />
             <Chip label={ds?.status ?? 'profiled'}                        size="small" sx={{ bgcolor: alpha(ACCENT, 0.1), color: ACCENT }} />
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<DownloadIcon sx={{ fontSize: 14 }} />}
+              onClick={handleExport}
+              sx={{
+                borderColor: 'rgba(255,255,255,0.1)', color: '#7A8AB0',
+                fontSize: '0.72rem', height: 26, px: 1.5,
+                '&:hover': { borderColor: alpha(ACCENT, 0.4), color: ACCENT },
+              }}
+            >
+              Export JSON
+            </Button>
           </Box>
         </Box>
 
