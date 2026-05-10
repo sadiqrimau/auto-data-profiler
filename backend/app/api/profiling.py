@@ -129,10 +129,10 @@ async def upload_and_profile(
             column_profiles.append(col_profile)
 
         # Quality assessment
-        completeness_score = compute_completeness(df)
-        validity_score     = compute_validity(df)
-        consistency_score  = compute_consistency(df)
-        accuracy_score     = compute_accuracy(df)
+        completeness_score = float(compute_completeness(df))
+        validity_score     = float(compute_validity(df))
+        consistency_score  = float(compute_consistency(df))
+        accuracy_score     = float(compute_accuracy(df))
         overall_score = round(
             (completeness_score + validity_score + consistency_score + accuracy_score) / 4, 2
         )
@@ -143,14 +143,14 @@ async def upload_and_profile(
             validity_score=validity_score,
             consistency_score=consistency_score,
             accuracy_score=accuracy_score,
-            overall_score=overall_score,
+            overall_score=float(overall_score),
             issues={},
             anomalies=anomalies_by_column,
         )
         db.add(quality)
 
         dataset.status = "completed"
-        dataset.overall_quality_score = overall_score
+        dataset.overall_quality_score = float(overall_score)
         db.commit()
         db.refresh(dataset)
 
